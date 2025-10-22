@@ -286,7 +286,7 @@ fun AddIdeaForm(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text("💡 Nueva Idea", style = MaterialTheme.typography.headlineMedium)
+                Text(" Nueva Idea", style = MaterialTheme.typography.headlineMedium)
 
                 OutlinedTextField(title, { title = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(desc, { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
@@ -305,7 +305,7 @@ fun AddIdeaForm(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (selectedLat != null && selectedLng != null) {
-                        Text("📍 %.4f, %.4f".format(selectedLat, selectedLng),
+                        Text(" %.4f, %.4f".format(selectedLat, selectedLng),
                             color = MaterialTheme.colorScheme.primary)
                     } else {
                         Text("Toca el mapa o usa tu ubicación")

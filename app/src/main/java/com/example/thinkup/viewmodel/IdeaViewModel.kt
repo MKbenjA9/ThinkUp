@@ -55,7 +55,7 @@ class IdeaViewModel(app: Application): AndroidViewModel(app) {
 
     fun deleteIdea(id: Long) {
         viewModelScope.launch {
-            repo.deleteIdea(id)        // 👈 agrega este método en tu repo (ver sección 3)
+            repo.deleteIdea(id)
             _state.value = _state.value.copy(items = repo.getAll())
         }
     }
