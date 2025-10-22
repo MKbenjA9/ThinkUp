@@ -28,7 +28,9 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 
+
 enum class IdeasTab { MAP, ADD, MINE }
+
 
 @Composable
 fun IdeasHome(
@@ -54,16 +56,20 @@ fun IdeasHome(
             },
             onMarkerInfo = { lat, lng -> ideaVM.setMarker(lat, lng) },
             selectedLat = st.selectedLat,
-            selectedLng = st.selectedLng
+            selectedLng = st.selectedLng,
+            onCancel = {
+                tab = IdeasTab.MAP
+            }
         )
         IdeasTab.MINE -> MyIdeasScreen(
             authName = authName,
             st = st,
-            onDelete = { id -> ideaVM.deleteIdea(id) },   // 👈 borrar
+            onDelete = { id -> ideaVM.deleteIdea(id) },
             onBack = { tab = IdeasTab.MAP }
         )
     }
 }
+
 
 @Composable
 fun IdeasMapFullScreen(
@@ -96,6 +102,7 @@ fun IdeasMapFullScreen(
             }
         }
 
+
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -119,6 +126,7 @@ fun IdeasMapFullScreen(
             }
         }
 
+
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -138,26 +146,26 @@ fun IdeasMapFullScreen(
                 Button(
                     onClick = onAddIdea,
                     modifier = Modifier.weight(1f).height(52.dp)
-                ) { Text("💡 Agregar") }
+                ) { Text(" Agregar") }
 
                 OutlinedButton(
                     onClick = onRandom,
                     modifier = Modifier.weight(1f).height(52.dp)
-                ) { Text("🎲 Random") }
+                ) { Text(" Random") }
 
                 OutlinedButton(
                     onClick = onMine,
                     modifier = Modifier.weight(1f).height(52.dp)
-                ) { Text("🧑 Mis ideas") }
-
+                ) { Text(" Mis ideas") }
                 TextButton(
                     onClick = onBack,
                     modifier = Modifier.height(52.dp)
-                ) { Text("↩️ Volver") }
+                ) { Text("↩ Volver") }
             }
         }
     }
 }
+
 
 @Composable
 fun MyIdeasScreen(
@@ -170,7 +178,6 @@ fun MyIdeasScreen(
         st.items.filter { it.author.equals(authName, ignoreCase = true) }
             .sortedByDescending { it.id }
     }
-
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
@@ -180,6 +187,7 @@ fun MyIdeasScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -190,11 +198,10 @@ fun MyIdeasScreen(
                         Text("Tus ideas publicadas: ${mine.size}")
                     }
                 }
-
                 Divider()
 
                 if (mine.isEmpty()) {
-                    Text("Aún no has agregado ideas. ¡Publica la primera! 😊")
+                    Text("Aún no has agregado ideas. ¡Publica la primera! ")
                 } else {
                     mine.forEach { idea ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
@@ -224,12 +231,11 @@ fun MyIdeasScreen(
         }
     }
 
-
     if (pendingDeleteId != null) {
         AlertDialog(
             onDismissRequest = { pendingDeleteId = null },
             title = { Text("Eliminar idea") },
-            text = { Text("¿Seguro que quieres eliminar esta idea? Esta acción no se puede deshacer.") },
+            text = { Text("¿Seguro que quieres eliminar esta idea?") },
             confirmButton = {
                 TextButton(onClick = {
                     pendingDeleteId?.let(onDelete)
@@ -264,13 +270,15 @@ private fun UserAvatar(initials: String) {
 private fun initialsFromName(name: String): String =
     name.trim().split(Regex("\\s+")).take(2).map { it.first().uppercaseChar() }.joinToString("")
 
+
 @SuppressLint("MissingPermission")
 @Composable
 fun AddIdeaForm(
     onSave: (String, String, String) -> Unit,
     onMarkerInfo: (Double, Double) -> Unit,
     selectedLat: Double?,
-    selectedLng: Double?
+    selectedLng: Double?,
+    onCancel: () -> Unit
 ) {
     val ctx = LocalContext.current
     val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
@@ -286,7 +294,15 @@ fun AddIdeaForm(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(" Nueva Idea", style = MaterialTheme.typography.headlineMedium)
+                // Cabecera con Cancelar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("💡 Nueva Idea", style = MaterialTheme.typography.headlineMedium)
+                    TextButton(onClick = onCancel) { Text("Cancelar") }
+                }
 
                 OutlinedTextField(title, { title = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
                 OutlinedTextField(desc, { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
@@ -317,18 +333,26 @@ fun AddIdeaForm(
                     }) { Text("Usar mi ubicación") }
                 }
 
-                Button(
-                    onClick = { onSave(title.trim(), desc.trim(), cat.trim()) },
-                    enabled = title.isNotBlank() && desc.isNotBlank() && cat.isNotBlank()
-                            && selectedLat != null && selectedLng != null,
-                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
-                    shape = MaterialTheme.shapes.large
-                ) { Text("Guardar") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedButton(
+                        onClick = onCancel,
+                        modifier = Modifier.weight(1f).height(52.dp)
+                    ) { Text("Cancelar") }
+
+                    Button(
+                        onClick = { onSave(title.trim(), desc.trim(), cat.trim()) },
+                        enabled = title.isNotBlank() && desc.isNotBlank() && cat.isNotBlank()
+                                && selectedLat != null && selectedLng != null,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        shape = MaterialTheme.shapes.large
+                    ) { Text("Guardar") }
+                }
             }
         }
     }
 }
 
+/* ================== Mapa de selección para el form ================== */
 @Composable
 fun SelectableMap(
     onPick: (Double, Double) -> Unit,
@@ -352,6 +376,7 @@ fun SelectableMap(
     }
 }
 
+/* ================== Marcadores “comunidad” para el mapa ================== */
 private fun sampleIdeasForChile(): List<Idea> = listOf(
     Idea(100, "Completo italiano", "", "Comida", -33.4569, -70.6483, "Cristian"),
     Idea(101, "Cerro San Cristóbal", "", "Paseo", -33.4275, -70.6335, "María"),
