@@ -1,29 +1,31 @@
-package com.example.thinkup.ui.theme
+package com.example.thinkup.ui
 
-
-import android.Manifest
 import android.annotation.SuppressLint
 import android.location.Location
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import com.example.thinkup.viewmodel.IdeaViewModel
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.thinkup.model.Idea
+import com.example.thinkup.viewmodel.IdeaViewModel
 import com.example.thinkup.viewmodel.IdeasState
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 
+// pestañas: Mapa en pantalla completa o Formulario
+enum class IdeasTab { MAP, ADD }
+
+/* ================== Contenedor principal ================== */
 @Composable
 fun IdeasHome(
     authName: String,
@@ -31,47 +33,120 @@ fun IdeasHome(
     ideaVM: IdeaViewModel = viewModel()
 ) {
     val st by ideaVM.state.collectAsState()
-    var showAdd by remember { mutableStateOf(false) }
-    var showMap by remember { mutableStateOf(true) } // mapa por defecto
+    var tab by rememberSaveable { mutableStateOf(IdeasTab.MAP) } // ⬅️ inicia en MAP
 
-    Column(Modifier.fillMaxSize().padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { showMap = true; showAdd = false }) { Text("Ver mapa") }
-            Button(onClick = { showMap = false; showAdd = true }) { Text("Agregar idea") }
-            Button(onClick = { ideaVM.randomIdea() }) { Text("Idea random") }
-            OutlinedButton(onClick = onBackToHome) { Text("Volver") }
+    when (tab) {
+        IdeasTab.MAP -> IdeasMapFullScreen(
+            st = st,
+            onAddIdea = { tab = IdeasTab.ADD },
+            onRandom = { ideaVM.randomIdea() },
+            onBack = onBackToHome
+        )
+        IdeasTab.ADD -> AddIdeaForm(
+            onSave = { t, d, c -> ideaVM.saveIdea(t, d, c, authName).also { tab = IdeasTab.MAP } },
+            onMarkerInfo = { lat, lng -> ideaVM.setMarker(lat, lng) },
+            selectedLat = st.selectedLat,
+            selectedLng = st.selectedLng
+        )
+    }
+}
+
+/* ================== Mapa FULL SCREEN + botones abajo ================== */
+@Composable
+fun IdeasMapFullScreen(
+    st: IdeasState,
+    onAddIdea: () -> Unit,
+    onRandom: () -> Unit,
+    onBack: () -> Unit
+) {
+    val camPos = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(-33.4489, -70.6693), 11f)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()   // respeta notch/barras
+    ) {
+        // MAPA ocupa todo
+        GoogleMap(
+            modifier = Modifier.matchParentSize(),
+            cameraPositionState = camPos
+        ) {
+            val all = st.items + sampleIdeasForChile()
+            all.forEach { idea ->
+                Marker(
+                    state = MarkerState(LatLng(idea.lat, idea.lng)),
+                    title = idea.title,
+                    snippet = "${idea.category} • ${idea.author}"
+                )
+            }
         }
 
-        if (st.error != null) Text(st.error!!, color = MaterialTheme.colorScheme.error)
-
-        if (st.randomIdea != null) {
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Idea random", style = MaterialTheme.typography.titleMedium)
-                    Text(st.randomIdea!!.title, style = MaterialTheme.typography.titleLarge)
-                    Text(st.randomIdea!!.description)
-                    Text("Categoría: ${st.randomIdea!!.category}")
-                    Text("Autor: ${st.randomIdea!!.author}")
-                    TextButton(onClick = { ideaVM.clearRandom() }) { Text("Cerrar") }
+        // Mensajes ligeros (error o random) flotando arriba
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+                .fillMaxWidth(0.95f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            st.error?.let {
+                AssistChip(onClick = {}, label = { Text(it) })
+            }
+            st.randomIdea?.let {
+                ElevatedCard {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("Idea random", style = MaterialTheme.typography.titleMedium)
+                        Text(it.title, style = MaterialTheme.typography.titleLarge)
+                        if (it.description.isNotBlank()) Text(it.description)
+                        Text("Categoría: ${it.category}")
+                        Text("Autor: ${it.author}")
+                        TextButton(onClick = onRandom) { Text("Otra") }
+                    }
                 }
             }
         }
 
-        if (showAdd) {
-            AddIdeaForm(
-                onSave = { t, d, c -> ideaVM.saveIdea(t, d, c, authName) },
-                onMarkerInfo = { lat, lng -> ideaVM.setMarker(lat, lng) },
-                selectedLat = st.selectedLat,
-                selectedLng = st.selectedLng
-            )
-        } else if (showMap) {
-            IdeasMap(st)
-        }
+        // BOTONERA pegada abajo
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(12.dp)
+                .fillMaxWidth(),
+            tonalElevation = 6.dp,
+            shape = MaterialTheme.shapes.large
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(12.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onAddIdea,
+                    modifier = Modifier.weight(1f).height(52.dp)
+                ) { Text("💡 Agregar idea") }
 
-        Text("Total de ideas: ${st.items.size}")
+                OutlinedButton(
+                    onClick = onRandom,
+                    modifier = Modifier.weight(1f).height(52.dp)
+                ) { Text("🎲 Idea random") }
+
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.height(52.dp)
+                ) { Text("↩️ Volver") }
+            }
+        }
     }
 }
 
+/* ================== Formulario ================== */
+@SuppressLint("MissingPermission")
 @Composable
 fun AddIdeaForm(
     onSave: (String, String, String) -> Unit,
@@ -79,101 +154,101 @@ fun AddIdeaForm(
     selectedLat: Double?,
     selectedLng: Double?
 ) {
+    val ctx = LocalContext.current
+    val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
     var title by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
     var cat by remember { mutableStateOf("") }
+    val scroll = rememberScrollState()
 
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Nueva Idea", style = MaterialTheme.typography.titleLarge)
-            OutlinedTextField(title, { title = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(desc, { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
-            OutlinedTextField(cat, { cat = it }, label = { Text("Categoría") }, modifier = Modifier.fillMaxWidth())
+    // Fondo scrollable centrado
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        ElevatedCard(Modifier.fillMaxWidth(0.92f)) {
+            Column(
+                Modifier.padding(20.dp).verticalScroll(scroll),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("💡 Nueva Idea", style = MaterialTheme.typography.headlineMedium)
 
-            Text("Elige ubicación en el mapa:")
-            Box(Modifier.height(250.dp).fillMaxWidth()) {
-                SelectableMap(onPick = { lat, lng -> onMarkerInfo(lat, lng) }, selectedLat = selectedLat, selectedLng = selectedLng)
-            }
+                OutlinedTextField(title, { title = it }, label = { Text("Título") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(desc, { desc = it }, label = { Text("Descripción") }, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(cat, { cat = it }, label = { Text("Categoría") }, modifier = Modifier.fillMaxWidth())
 
-            Text(if (selectedLat != null && selectedLng != null) "Ubicación: $selectedLat, $selectedLng" else "Sin ubicación seleccionada")
+                Text("Selecciona una ubicación en el mapa:")
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(240.dp).clip(MaterialTheme.shapes.medium)
+                ) {
+                    SelectableMap(
+                        onPick = { lat, lng -> onMarkerInfo(lat, lng) },
+                        selectedLat = selectedLat,
+                        selectedLng = selectedLng
+                    )
+                }
 
-            Button(onClick = { onSave(title, desc, cat) }, modifier = Modifier.fillMaxWidth()) {
-                Text("Guardar idea")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (selectedLat != null && selectedLng != null) {
+                        Text("📍 %.4f, %.4f".format(selectedLat, selectedLng),
+                            color = MaterialTheme.colorScheme.primary)
+                    } else {
+                        Text("Toca el mapa o usa tu ubicación")
+                    }
+                    TextButton(onClick = {
+                        fused.lastLocation.addOnSuccessListener { loc: Location? ->
+                            loc?.let { onMarkerInfo(it.latitude, it.longitude) }
+                        }
+                    }) { Text("Usar mi ubicación") }
+                }
+
+                Button(
+                    onClick = { onSave(title.trim(), desc.trim(), cat.trim()) },
+                    enabled = title.isNotBlank() && desc.isNotBlank() && cat.isNotBlank()
+                            && selectedLat != null && selectedLng != null,
+                    modifier = Modifier.fillMaxWidth(0.7f).height(52.dp),
+                    shape = MaterialTheme.shapes.large
+                ) { Text("Guardar") }
             }
         }
     }
 }
 
-@SuppressLint("MissingPermission")
+/* ================== Mapa para seleccionar punto ================== */
 @Composable
 fun SelectableMap(
     onPick: (Double, Double) -> Unit,
     selectedLat: Double?,
     selectedLng: Double?
 ) {
-    val ctx = LocalContext.current
-    val fused = remember { LocationServices.getFusedLocationProviderClient(ctx) }
-    var camPos by remember { mutableStateOf(CameraPositionState()) }
-
-    var hasFine by remember { mutableStateOf(false) }
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        hasFine = granted
+    val start = LatLng(-33.4489, -70.6693) // Santiago
+    val cameraState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(start, 12f)
     }
-    LaunchedEffect(Unit) { launcher.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
-
-
-    val defaultPos = com.google.android.gms.maps.model.LatLng(-33.4489, -70.6693)
-
-    LaunchedEffect(hasFine) {
-        if (hasFine) {
-            fused.lastLocation.addOnSuccessListener { loc: Location? ->
-                val here = if (loc != null) com.google.android.gms.maps.model.LatLng(loc.latitude, loc.longitude) else defaultPos
-                camPos.move(CameraUpdateFactory.newLatLngZoom(here, 13f))
-            }
-        } else {
-            camPos.move(CameraUpdateFactory.newLatLngZoom(defaultPos, 12f))
-        }
-    }
-
     GoogleMap(
-        modifier = Modifier.fillMaxSize(),
-        cameraPositionState = camPos,
-        properties = MapProperties(isMyLocationEnabled = hasFine),
-        onMapClick = { latLng ->
-            onPick(latLng.latitude, latLng.longitude)
-        }
+        cameraPositionState = cameraState,
+        properties = MapProperties(),
+        uiSettings = MapUiSettings(zoomControlsEnabled = true),
+        onMapClick = { p -> onPick(p.latitude, p.longitude) },
+        modifier = Modifier.fillMaxSize()
     ) {
         if (selectedLat != null && selectedLng != null) {
-            Marker(
-                state = MarkerState(position = com.google.android.gms.maps.model.LatLng(selectedLat, selectedLng)),
-                title = "Idea aquí"
-            )
+            Marker(state = MarkerState(LatLng(selectedLat, selectedLng)), title = "Idea aquí")
         }
     }
 }
 
-@Composable
-fun IdeasMap(st: IdeasState) {
-    val camPos = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(
-            LatLng(-33.4489, -70.6693), // Santiago centro
-            11f
-        )
-    }
-
-    GoogleMap(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(400.dp),
-        cameraPositionState = camPos
-    ) {
-        st.items.forEach { idea ->
-            Marker(
-                state = MarkerState(position = LatLng(idea.lat, idea.lng)),
-                title = idea.title,
-                snippet = "${idea.category} • ${idea.author}"
-            )
-        }
-    }
-}
-
+/* ================== Ideas base para poblar el mapa ================== */
+private fun sampleIdeasForChile(): List<Idea> = listOf(
+    Idea(100, "Completo italiano", "", "Comida", -33.4569, -70.6483, "Cristian"),
+    Idea(101, "Cerro San Cristóbal", "", "Paseo", -33.4275, -70.6335, "María"),
+    Idea(102, "Barrio Lastarria", "", "Visita", -33.4387, -70.6426, "Josefa"),
+    Idea(103, "Pomaire", "Empanadas y artesanía", "Comida", -33.5561, -71.1778, "Valentina"),
+    Idea(104, "Parque Quinta Normal", "Museos y áreas verdes", "Paseo", -33.4430, -70.6837, "Sebastián"),
+    Idea(105, "Viña del Mar", "Playas", "Visita", -33.0245, -71.5518, "Carolina"),
+    Idea(106, "Cerro Ñielol", "Bosque nativo", "Paseo", -38.7259, -72.5975, "Felipe"),
+    Idea(107, "Mercado Central", "Mariscos", "Comida", -33.4331, -70.6476, "Catalina"),
+    Idea(108, "Valdivia centro", "Río y ferias", "Visita", -39.8142, -73.2459, "Ignacio"),
+    Idea(109, "San Pedro de Atacama", "Paisajes únicos", "Paseo", -22.9087, -68.1997, "Andrea"),
+    Idea(110, "Curanto en Chiloé", "Tradición", "Comida", -42.4796, -73.7622, "Pablo"),
+    Idea(111, "Lago Llanquihue", "Vista al Osorno", "Visita", -41.3160, -72.9854, "Sofía"),
+    Idea(112, "Cajón del Maipo", "Trekking", "Paseo", -33.6552, -70.3273, "Benjamín")
+)
