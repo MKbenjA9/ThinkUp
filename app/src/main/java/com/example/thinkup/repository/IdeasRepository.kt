@@ -10,6 +10,8 @@ class IdeasRepository(context: Context) {
     private val sp = context.getSharedPreferences("ideas_prefs", Context.MODE_PRIVATE)
     private val KEY = "ideas_json"
 
+    /* ===== CRUD ===== */
+
     fun saveIdea(idea: Idea) {
         val all = getAll().toMutableList()
         all.add(idea)
@@ -21,13 +23,34 @@ class IdeasRepository(context: Context) {
         return deserialize(raw)
     }
 
-    fun getRandom(): Idea? = getAll().ifEmpty { return null }.let { list ->
-        list[Random.nextInt(list.size)]
+    fun getByAuthor(author: String): List<Idea> =
+        getAll().filter { it.author.equals(author, ignoreCase = true) }
+
+    fun getRandom(): Idea? {
+        val list = getAll()
+        if (list.isEmpty()) return null
+        return list[Random.nextInt(list.size)]
+    }
+
+    fun deleteIdea(id: Long) {
+        val current = getAll()
+        val updated = current.filterNot { it.id == id }
+        if (updated.size != current.size) {
+            sp.edit().putString(KEY, serialize(updated)).apply()
+        }
+        // si no cambió el tamaño, no había una idea con ese ID; no hacemos nada
+    }
+
+    fun deleteAllByAuthor(author: String) {
+        val updated = getAll().filterNot { it.author.equals(author, ignoreCase = true) }
+        sp.edit().putString(KEY, serialize(updated)).apply()
     }
 
     fun clearAll() {
         sp.edit().putString(KEY, "[]").apply()
     }
+
+
 
     private fun serialize(list: List<Idea>): String {
         val arr = JSONArray()
@@ -50,17 +73,26 @@ class IdeasRepository(context: Context) {
         val arr = JSONArray(raw)
         val out = mutableListOf<Idea>()
         for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
+            val o = arr.optJSONObject(i) ?: continue
+            val id = o.optLong("id", System.currentTimeMillis())
+            val title = o.optString("title", "")
+            val description = o.optString("description", "")
+            val category = o.optString("category", "")
+            val lat = o.optDouble("lat", .0)
+            val lng = o.optDouble("lng", .0)
+            val author = o.optString("author", "Desconocido")
+            val createdAt = o.optLong("createdAt", id) // fallback razonable
+
             out.add(
                 Idea(
-                    id = o.getLong("id"),
-                    title = o.getString("title"),
-                    description = o.getString("description"),
-                    category = o.getString("category"),
-                    lat = o.getDouble("lat"),
-                    lng = o.getDouble("lng"),
-                    author = o.getString("author"),
-                    createdAt = o.getLong("createdAt")
+                    id = id,
+                    title = title,
+                    description = description,
+                    category = category,
+                    lat = lat,
+                    lng = lng,
+                    author = author,
+                    createdAt = createdAt
                 )
             )
         }

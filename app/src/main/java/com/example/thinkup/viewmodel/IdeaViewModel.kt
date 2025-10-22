@@ -3,8 +3,8 @@ package com.example.thinkup.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.thinkup.model.Idea
 import com.example.thinkup.repository.IdeasRepository
+import com.example.thinkup.model.Idea
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -18,7 +18,7 @@ data class IdeasState(
     val randomIdea: Idea? = null
 )
 
-class IdeaViewModel(app: Application) : AndroidViewModel(app) {
+class IdeaViewModel(app: Application): AndroidViewModel(app) {
     private val repo = IdeasRepository(app)
     private val _state = MutableStateFlow(IdeasState())
     val state: StateFlow<IdeasState> = _state
@@ -42,15 +42,21 @@ class IdeaViewModel(app: Application) : AndroidViewModel(app) {
         }
         viewModelScope.launch {
             val id = System.currentTimeMillis() + abs(title.hashCode())
-            repo.saveIdea(
-                Idea(id, title.trim(), description.trim(), category.trim(), lat, lng, author)
-            )
+            repo.saveIdea(Idea(id, title.trim(), description.trim(), category.trim(), lat, lng, author))
             _state.value = _state.value.copy(
                 items = repo.getAll(),
                 selectedLat = null,
                 selectedLng = null,
                 error = null
             )
+        }
+    }
+
+
+    fun deleteIdea(id: Long) {
+        viewModelScope.launch {
+            repo.deleteIdea(id)        // 👈 agrega este método en tu repo (ver sección 3)
+            _state.value = _state.value.copy(items = repo.getAll())
         }
     }
 
@@ -71,15 +77,9 @@ class IdeaViewModel(app: Application) : AndroidViewModel(app) {
         Idea(112, "Cajón del Maipo", "Trekking y naturaleza", "Paseo", -33.6552, -70.3273, "Benjamín")
     )
 
-
     fun randomCommunityIdea() {
-        if (communityPool.isEmpty()) {
-            _state.value = _state.value.copy(error = "No hay ideas de la comunidad aún 😅")
-            return
-        }
         _state.value = _state.value.copy(randomIdea = communityPool.random(), error = null)
     }
-
 
     fun randomMyIdea() {
         val mine = repo.getAll()
@@ -90,15 +90,10 @@ class IdeaViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(randomIdea = mine.random(), error = null)
     }
 
-
     fun randomMixed() {
-        val pool = repo.getAll() + communityPool
+        val mine = repo.getAll()
+        val pool = if (mine.isEmpty()) communityPool else communityPool + mine
         _state.value = _state.value.copy(randomIdea = pool.random(), error = null)
-    }
-
-
-    fun randomIdea() {
-        _state.value = _state.value.copy(randomIdea = repo.getRandom())
     }
 
     fun clearRandom() {

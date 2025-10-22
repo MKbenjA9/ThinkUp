@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,13 +28,11 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 
-// pestañas: Mapa, Formulario y Mis ideas
 enum class IdeasTab { MAP, ADD, MINE }
 
-/* ================== Contenedor principal ================== */
 @Composable
 fun IdeasHome(
-    authName: String,                 // nombre del usuario logueado
+    authName: String,
     onBackToHome: () -> Unit,
     ideaVM: IdeaViewModel = viewModel()
 ) {
@@ -43,7 +43,7 @@ fun IdeasHome(
         IdeasTab.MAP -> IdeasMapFullScreen(
             st = st,
             onAddIdea = { tab = IdeasTab.ADD },
-            onRandom = { ideaVM.randomCommunityIdea() },  // comunidad
+            onRandom = { ideaVM.randomCommunityIdea() },
             onMine = { tab = IdeasTab.MINE },
             onBack = onBackToHome
         )
@@ -59,12 +59,12 @@ fun IdeasHome(
         IdeasTab.MINE -> MyIdeasScreen(
             authName = authName,
             st = st,
+            onDelete = { id -> ideaVM.deleteIdea(id) },   // 👈 borrar
             onBack = { tab = IdeasTab.MAP }
         )
     }
 }
 
-/* ================== Mapa FULL SCREEN + barra abajo ================== */
 @Composable
 fun IdeasMapFullScreen(
     st: IdeasState,
@@ -159,17 +159,19 @@ fun IdeasMapFullScreen(
     }
 }
 
-/* ================== MIS IDEAS + perfil ================== */
 @Composable
 fun MyIdeasScreen(
     authName: String,
     st: IdeasState,
+    onDelete: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val mine = remember(st.items, authName) {
         st.items.filter { it.author.equals(authName, ignoreCase = true) }
             .sortedByDescending { it.id }
     }
+
+    var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
 
     Box(Modifier.fillMaxSize().systemBarsPadding(), contentAlignment = Alignment.Center) {
         ElevatedCard(Modifier.fillMaxWidth(0.92f)) {
@@ -178,7 +180,6 @@ fun MyIdeasScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header de usuario
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -197,8 +198,17 @@ fun MyIdeasScreen(
                 } else {
                     mine.forEach { idea ->
                         ElevatedCard(Modifier.fillMaxWidth()) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(idea.title, style = MaterialTheme.typography.titleMedium)
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(idea.title, style = MaterialTheme.typography.titleMedium)
+                                    IconButton(onClick = { pendingDeleteId = idea.id }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
+                                    }
+                                }
                                 if (idea.description.isNotBlank()) Text(idea.description)
                                 Text("Categoría: ${idea.category}")
                                 Text("Ubicación: %.4f, %.4f".format(idea.lat, idea.lng))
@@ -207,14 +217,29 @@ fun MyIdeasScreen(
                     }
                 }
 
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onBack) { Text("Volver al mapa") }
                 }
             }
         }
+    }
+
+
+    if (pendingDeleteId != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDeleteId = null },
+            title = { Text("Eliminar idea") },
+            text = { Text("¿Seguro que quieres eliminar esta idea? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingDeleteId?.let(onDelete)
+                    pendingDeleteId = null
+                }) { Text("Eliminar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteId = null }) { Text("Cancelar") }
+            }
+        )
     }
 }
 
@@ -237,13 +262,8 @@ private fun UserAvatar(initials: String) {
 }
 
 private fun initialsFromName(name: String): String =
-    name.trim()
-        .split(Regex("\\s+"))
-        .take(2)
-        .map { it.first().uppercaseChar() }
-        .joinToString("")
+    name.trim().split(Regex("\\s+")).take(2).map { it.first().uppercaseChar() }.joinToString("")
 
-/* ================== Formulario ================== */
 @SuppressLint("MissingPermission")
 @Composable
 fun AddIdeaForm(
@@ -309,7 +329,6 @@ fun AddIdeaForm(
     }
 }
 
-/* ================== Mapa de selección ================== */
 @Composable
 fun SelectableMap(
     onPick: (Double, Double) -> Unit,
@@ -333,7 +352,6 @@ fun SelectableMap(
     }
 }
 
-/* ================== Ideas “comunidad” para poblar el mapa ================== */
 private fun sampleIdeasForChile(): List<Idea> = listOf(
     Idea(100, "Completo italiano", "", "Comida", -33.4569, -70.6483, "Cristian"),
     Idea(101, "Cerro San Cristóbal", "", "Paseo", -33.4275, -70.6335, "María"),
