@@ -1,8 +1,13 @@
 package com.example.thinkup.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
+@Entity(tableName = "users")
 data class User(
-    val name: String,
+    @PrimaryKey
     val email: String,
-    val password: String
+    val name: String,
+    val password: String,
+    val createdAt: Long = System.currentTimeMillis()
 )

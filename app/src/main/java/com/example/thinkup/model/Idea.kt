@@ -1,9 +1,12 @@
 package com.example.thinkup.model
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
-
+@Entity(tableName = "ideas")
 data class Idea(
-    val id: Long,
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
     val title: String,
     val description: String,
     val category: String,

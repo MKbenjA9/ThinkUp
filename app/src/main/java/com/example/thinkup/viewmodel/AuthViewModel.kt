@@ -28,6 +28,17 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(current = screen, error = null)
     }
 
+    fun logout() {
+        viewModelScope.launch {
+            try {
+                repo.logout()
+                _state.value = UiState(current = Screen.Login, user = null)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al cerrar sesión: ${e.message}")
+            }
+        }
+    }
+
     fun register(name: String, email: String, pass: String, confirm: String) {
         if (name.isBlank() || email.isBlank() || pass.isBlank() || confirm.isBlank()) {
             _state.value = _state.value.copy(error = "Completa todos los campos.")
@@ -39,11 +50,16 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         viewModelScope.launch {
-            val ok = repo.register(User(name, email, pass))
-            _state.value = if (ok)
-                UiState(current = Screen.Login)
-            else
-                _state.value.copy(error = "Ya hay un usuario registrado.")
+            try {
+                val user = User(email = email, name = name, password = pass)
+                val ok = repo.register(user)
+                _state.value = if (ok)
+                    UiState(current = Screen.Login)
+                else
+                    _state.value.copy(error = "Ya hay un usuario registrado.")
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al registrar usuario: ${e.message}")
+            }
         }
     }
 
@@ -54,16 +70,17 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         viewModelScope.launch {
-            val user = repo.login(email, pass)
-            _state.value = if (user != null)
-                UiState(current = Screen.Home, user = user)
-            else
-                _state.value.copy(error = "Credenciales incorrectas.")
+            try {
+                val user = repo.login(email, pass)
+                _state.value = if (user != null)
+                    UiState(current = Screen.Home, user = user)
+                else
+                    _state.value.copy(error = "Credenciales incorrectas.")
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al iniciar sesión: ${e.message}")
+            }
         }
     }
 
-    fun logout() {
-        repo.logout()
-        _state.value = UiState(current = Screen.Login)
-    }
+
 }

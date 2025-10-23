@@ -7,6 +7,7 @@ import com.example.thinkup.repository.IdeasRepository
 import com.example.thinkup.model.Idea
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
@@ -19,14 +20,25 @@ data class IdeasState(
 )
 
 class IdeaViewModel(app: Application): AndroidViewModel(app) {
-    private val repo = IdeasRepository(app)
+    private val repo = IdeasRepository(app.applicationContext)
     private val _state = MutableStateFlow(IdeasState())
-    val state: StateFlow<IdeasState> = _state
+    val state: StateFlow<IdeasState> = _state.asStateFlow()
 
-    init { refresh() }
+    init { 
+        observeIdeas()
+    }
+
+    private fun observeIdeas() {
+        viewModelScope.launch {
+            repo.getAll().collect { ideas ->
+                _state.value = _state.value.copy(items = ideas, error = null)
+            }
+        }
+    }
 
     fun refresh() {
-        _state.value = _state.value.copy(items = repo.getAll(), error = null)
+        // The Flow will automatically update the state when data changes
+        _state.value = _state.value.copy(error = null)
     }
 
     fun setMarker(lat: Double, lng: Double) {
@@ -41,22 +53,42 @@ class IdeaViewModel(app: Application): AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            val id = System.currentTimeMillis() + abs(title.hashCode())
-            repo.saveIdea(Idea(id, title.trim(), description.trim(), category.trim(), lat, lng, author))
-            _state.value = _state.value.copy(
-                items = repo.getAll(),
-                selectedLat = null,
-                selectedLng = null,
-                error = null
-            )
+            try {
+                val idea = Idea(
+                    title = title.trim(),
+                    description = description.trim(),
+                    category = category.trim(),
+                    lat = lat,
+                    lng = lng,
+                    author = author
+                )
+                val ideaId = repo.saveIdea(idea)
+                if (ideaId > 0) {
+                    _state.value = _state.value.copy(
+                        selectedLat = null,
+                        selectedLng = null,
+                        error = null
+                    )
+                } else {
+                    _state.value = _state.value.copy(error = "Error al guardar la idea.")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al guardar la idea: ${e.message}")
+            }
         }
     }
 
 
     fun deleteIdea(id: Long) {
         viewModelScope.launch {
-            repo.deleteIdea(id)
-            _state.value = _state.value.copy(items = repo.getAll())
+            try {
+                val success = repo.deleteIdea(id)
+                if (!success) {
+                    _state.value = _state.value.copy(error = "Error al eliminar la idea.")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al eliminar la idea: ${e.message}")
+            }
         }
     }
 
@@ -82,18 +114,30 @@ class IdeaViewModel(app: Application): AndroidViewModel(app) {
     }
 
     fun randomMyIdea() {
-        val mine = repo.getAll()
-        if (mine.isEmpty()) {
-            _state.value = _state.value.copy(error = "Aún no tienes ideas guardadas.")
-            return
+        viewModelScope.launch {
+            try {
+                val randomIdea = repo.getRandom()
+                if (randomIdea != null) {
+                    _state.value = _state.value.copy(randomIdea = randomIdea, error = null)
+                } else {
+                    _state.value = _state.value.copy(error = "Aún no tienes ideas guardadas.")
+                }
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al obtener idea aleatoria: ${e.message}")
+            }
         }
-        _state.value = _state.value.copy(randomIdea = mine.random(), error = null)
     }
 
     fun randomMixed() {
-        val mine = repo.getAll()
-        val pool = if (mine.isEmpty()) communityPool else communityPool + mine
-        _state.value = _state.value.copy(randomIdea = pool.random(), error = null)
+        viewModelScope.launch {
+            try {
+                val randomIdea = repo.getRandom()
+                val pool = if (randomIdea != null) communityPool + randomIdea else communityPool
+                _state.value = _state.value.copy(randomIdea = pool.random(), error = null)
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = "Error al obtener idea aleatoria: ${e.message}")
+            }
+        }
     }
 
     fun clearRandom() {

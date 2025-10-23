@@ -1,101 +1,85 @@
 package com.example.thinkup.repository
 
 import android.content.Context
+import com.example.thinkup.database.ThinkUpDatabase
 import com.example.thinkup.model.Idea
-import org.json.JSONArray
-import org.json.JSONObject
-import kotlin.random.Random
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
 
-class IdeasRepository(context: Context) {
-    private val sp = context.getSharedPreferences("ideas_prefs", Context.MODE_PRIVATE)
-    private val KEY = "ideas_json"
+class IdeasRepository(private val context: Context) {
+    
+    private val database = ThinkUpDatabase.getDatabase(context)
+    private val ideaDao = database.ideaDao()
 
     /* ===== CRUD ===== */
 
-    fun saveIdea(idea: Idea) {
-        val all = getAll().toMutableList()
-        all.add(idea)
-        sp.edit().putString(KEY, serialize(all)).apply()
-    }
-
-    fun getAll(): List<Idea> {
-        val raw = sp.getString(KEY, "[]") ?: "[]"
-        return deserialize(raw)
-    }
-
-    fun getByAuthor(author: String): List<Idea> =
-        getAll().filter { it.author.equals(author, ignoreCase = true) }
-
-    fun getRandom(): Idea? {
-        val list = getAll()
-        if (list.isEmpty()) return null
-        return list[Random.nextInt(list.size)]
-    }
-
-    fun deleteIdea(id: Long) {
-        val current = getAll()
-        val updated = current.filterNot { it.id == id }
-        if (updated.size != current.size) {
-            sp.edit().putString(KEY, serialize(updated)).apply()
+    suspend fun saveIdea(idea: Idea): Long = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.insertIdea(idea)
+        } catch (e: Exception) {
+            -1L
         }
-        // si no cambió el tamaño, no había una idea con ese ID; no hacemos nada
     }
 
-    fun deleteAllByAuthor(author: String) {
-        val updated = getAll().filterNot { it.author.equals(author, ignoreCase = true) }
-        sp.edit().putString(KEY, serialize(updated)).apply()
-    }
+    fun getAll(): Flow<List<Idea>> = ideaDao.getAllIdeas()
 
-    fun clearAll() {
-        sp.edit().putString(KEY, "[]").apply()
-    }
+    fun getByAuthor(author: String): Flow<List<Idea>> = ideaDao.getIdeasByAuthor(author)
 
-
-
-    private fun serialize(list: List<Idea>): String {
-        val arr = JSONArray()
-        list.forEach {
-            arr.put(JSONObject().apply {
-                put("id", it.id)
-                put("title", it.title)
-                put("description", it.description)
-                put("category", it.category)
-                put("lat", it.lat)
-                put("lng", it.lng)
-                put("author", it.author)
-                put("createdAt", it.createdAt)
-            })
+    suspend fun getRandom(): Idea? = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.getRandomIdea()
+        } catch (e: Exception) {
+            null
         }
-        return arr.toString()
     }
 
-    private fun deserialize(raw: String): List<Idea> {
-        val arr = JSONArray(raw)
-        val out = mutableListOf<Idea>()
-        for (i in 0 until arr.length()) {
-            val o = arr.optJSONObject(i) ?: continue
-            val id = o.optLong("id", System.currentTimeMillis())
-            val title = o.optString("title", "")
-            val description = o.optString("description", "")
-            val category = o.optString("category", "")
-            val lat = o.optDouble("lat", .0)
-            val lng = o.optDouble("lng", .0)
-            val author = o.optString("author", "Desconocido")
-            val createdAt = o.optLong("createdAt", id) // fallback razonable
-
-            out.add(
-                Idea(
-                    id = id,
-                    title = title,
-                    description = description,
-                    category = category,
-                    lat = lat,
-                    lng = lng,
-                    author = author,
-                    createdAt = createdAt
-                )
-            )
+    suspend fun getIdeaById(id: Long): Idea? = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.getIdeaById(id)
+        } catch (e: Exception) {
+            null
         }
-        return out
+    }
+
+    fun getIdeasByCategory(category: String): Flow<List<Idea>> = ideaDao.getIdeasByCategory(category)
+
+    fun getIdeasInArea(minLat: Double, maxLat: Double, minLng: Double, maxLng: Double): Flow<List<Idea>> = 
+        ideaDao.getIdeasInArea(minLat, maxLat, minLng, maxLng)
+
+    suspend fun updateIdea(idea: Idea): Boolean = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.updateIdea(idea)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun deleteIdea(id: Long): Boolean = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.deleteIdeaById(id)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun deleteAllByAuthor(author: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.deleteIdeasByAuthor(author)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    suspend fun clearAll(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            ideaDao.deleteAllIdeas()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }
