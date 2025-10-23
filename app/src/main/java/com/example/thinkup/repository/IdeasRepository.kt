@@ -1,7 +1,7 @@
 package com.example.thinkup.repository
 
 import android.content.Context
-import com.example.thinkup.database.ThinkUpDatabase
+import com.example.thinkup.data.ThinkUpDatabase
 import com.example.thinkup.model.Idea
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow

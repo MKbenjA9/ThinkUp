@@ -1,7 +1,6 @@
-package com.example.thinkup.database
+package com.example.thinkup.model
 
 import androidx.room.*
-import com.example.thinkup.model.User
 import kotlinx.coroutines.flow.Flow
 
 @Dao

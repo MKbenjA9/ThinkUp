@@ -376,7 +376,7 @@ fun SelectableMap(
     }
 }
 
-/* ================== Marcadores “comunidad” para el mapa ================== */
+/* ================== Marcadores "comunidad" para el mapa ================== */
 private fun sampleIdeasForChile(): List<Idea> = listOf(
     Idea(100, "Completo italiano", "", "Comida", -33.4569, -70.6483, "Cristian"),
     Idea(101, "Cerro San Cristóbal", "", "Paseo", -33.4275, -70.6335, "María"),

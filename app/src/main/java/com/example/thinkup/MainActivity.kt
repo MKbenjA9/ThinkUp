@@ -3,7 +3,7 @@ package com.example.thinkup
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.example.thinkup.ui.theme.AuthApp
+import com.example.thinkup.ui.AuthApp
 import com.example.thinkup.ui.theme.ThinkUpTheme
 
 class MainActivity : ComponentActivity() {

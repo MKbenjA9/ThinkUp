@@ -1,4 +1,4 @@
-package com.example.thinkup.ui.theme
+package com.example.thinkup.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -11,7 +11,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.thinkup.R
-import com.example.thinkup.ui.IdeasHome
 import com.example.thinkup.viewmodel.AuthViewModel
 import com.example.thinkup.viewmodel.Screen
 
@@ -144,7 +143,7 @@ fun HomeScreen(name: String, onLogout: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Logo arriba también si quieres
+
                 Image(
                     painter = painterResource(id = R.drawable.logo_thinkup),
                     contentDescription = "Logo ThinkUp",
