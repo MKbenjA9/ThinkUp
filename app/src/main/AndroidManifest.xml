@@ -2,9 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Permisos de ubicación para Google Maps / MyLocation -->
+    <!-- Permisos de ubicación para Google Maps -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:name=".ThinkUpApplication"
@@ -17,10 +18,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ThinkUp">
 
-        <!-- API Key de Google Maps -->
+
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="TU_API_KEY_DE_GOOGLE_MAPS_AQUI" />
+            android:value="AIzaSyB-HPMmy2Ts-Fy1rIQecDeeyNLVvAAGGOA" />
 
         <activity
             android:name=".MainActivity"
